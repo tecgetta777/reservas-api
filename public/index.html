@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reservas – demo en tiempo real</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:640px;margin:2rem auto;padding:0 1rem;color:#222}
+  input,button{padding:.5rem;margin:.2rem 0;width:100%;box-sizing:border-box}
+  button{cursor:pointer}
+  #log{background:#111;color:#9f9;padding:1rem;border-radius:6px;min-height:8rem;font:13px/1.5 monospace;white-space:pre-wrap}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+</style>
+</head>
+<body>
+<h1>Reservas en vivo</h1>
+<p>Inicia sesión y abre esta página en dos pestañas: los cambios hechos por la API (curl, Postman) aparecen aquí al instante.</p>
+<div class="row">
+  <input id="email" placeholder="correo" type="email">
+  <input id="password" placeholder="contraseña" type="password">
+</div>
+<div class="row">
+  <button id="login">Iniciar sesión</button>
+  <button id="register">Registrarme (nombre = correo)</button>
+</div>
+<h3>Eventos</h3>
+<div id="log">Sin conexión…</div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const log = document.getElementById('log');
+const say = (m) => { log.textContent = `[${new Date().toLocaleTimeString()}] ${m}\n` + log.textContent; };
+let socket;
+function connect() {
+  if (socket) socket.close();
+  socket = io();
+  socket.on('connect', () => say('Conectado al canal en tiempo real'));
+  socket.on('connect_error', (e) => say('No conectado: ' + e.message));
+  for (const ev of ['created', 'updated', 'deleted'])
+    socket.on('reservation:' + ev, (d) => say(`reservation:${ev} ${JSON.stringify(d)}`));
+}
+async function auth(path, withName) {
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  const res = await fetch('/api/auth/' + path, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email, password, ...(withName && { name: email }) }),
+  });
+  const json = await res.json();
+  if (!res.ok) return say(`Error ${res.status}: ${json.error.message}`);
+  say('Sesión iniciada'); connect();
+}
+document.getElementById('login').onclick = () => auth('login');
+document.getElementById('register').onclick = () => auth('register', true);
+fetch('/api/auth/me').then((r) => r.ok && (say('Sesión activa'), connect()));
+</script>
+</body>
+</html>
